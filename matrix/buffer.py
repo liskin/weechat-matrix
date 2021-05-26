@@ -539,11 +539,6 @@ class WeechatChannelBuffer(object):
 
         tags.append("nick_{nick}".format(nick=user.nick))
 
-        color = self._color_for_tags(user.color)
-
-        if message_type not in ("action", "notice"):
-            tags.append("prefix_nick_{color}".format(color=color))
-
         return tags
 
     def _get_user(self, nick):
@@ -555,25 +550,16 @@ class WeechatChannelBuffer(object):
         return WeechatUser(nick)
 
     def _print_message(self, user, message, date, tags, extra_prefix=""):
-        prefix_string = (
-            extra_prefix
-            if not user.prefix
-            else "{}{}{}{}".format(
-                extra_prefix,
-                W.color(self._get_prefix_color(user.prefix)),
-                user.prefix,
-                W.color("reset"),
-            )
-        )
+        user_prefix = _colorize_string(
+            self._get_prefix_color(user.prefix),
+            user.prefix
+        ) if user.prefix else ""
 
-        data = "{prefix}{color}{author}{ncolor}\t{msg}".format(
-            prefix=prefix_string,
-            color=W.color(user.color),
-            author=user.nick,
-            ncolor=W.color("reset"),
+        data = "{prefix}{author}\t{msg}".format(
+            prefix=extra_prefix,
+            author=_format_nick(user_prefix + _colorize_string(user.color, user.nick)),
             msg=message,
         )
-
         self.print_date_tags(data, date, tags)
 
     def message(self, nick, message, date, extra_tags=None, extra_prefix=""):
@@ -1823,3 +1809,27 @@ class RoomBuffer(object):
     def error(self, string):
         # type: (str) -> None
         self.weechat_buffer.error(string)
+
+
+def _format_nick(nick):
+    nick_prefix = W.config_string(W.config_get("weechat.look.nick_prefix"))
+    nick_prefix_color_name = W.config_string(
+        W.config_get("weechat.color.chat_nick_prefix")
+    )
+
+    nick_suffix = W.config_string(W.config_get("weechat.look.nick_suffix"))
+    nick_suffix_color_name = W.config_string(
+        W.config_get("weechat.color.chat_nick_prefix")
+    )
+    return (
+        _colorize_string(nick_prefix_color_name, nick_prefix)
+        + nick
+        + _colorize_string(nick_suffix_color_name, nick_suffix)
+    )
+
+
+def _colorize_string(color, string, reset_color="reset"):
+    if color:
+        return W.color(color) + string + W.color(reset_color)
+    else:
+        return string
